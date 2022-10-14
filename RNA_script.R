@@ -106,7 +106,7 @@ pathGenerate <- function(geneset, geneType){
   # Map the EMSEMBL IDs to their ENTREZID
   sameGenesEntrez <- na.exclude(mapIds(org.Mm.eg.db, 
                                        keys = as.character(geneset$Symbol),
-                                       keytype = "GENENAME", column = "ENTREZID"))
+                                       keytype = "SYMBOL", column = "ENTREZID"))
   
   # Function for enrichKEGG analysis and pathway dataset generation
   # By default, this works on mouse (mmu) only
