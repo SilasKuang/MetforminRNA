@@ -13,93 +13,115 @@ library(ggplot2)
 library(clusterProfiler)
 library(org.Mm.eg.db)
 
-# Compare AET vs AET+MET groups
 # Note: Since in this project, we have not tested for MET only
 # So, MET means AET+MET unless otherwise specified
-rawDGE_AET_vs_MET <- read_excel("Genes_AET_vs_AET+MET.xlsx")
-curatedDGE_AET_vs_MET <- rawDGE_AET_vs_MET[,c(8,2,5,6,7)]
-colnames(curatedDGE_AET_vs_MET) <- c("Symbol", "logFC", "pval", "FDR", "Group")
+import_dataset <- function(filename){
+  rawDGE <- read_excel(filename)
+  curatedDGE <- rawDGE[,c(8,2,5,6,7)]
+  colnames(curatedDGE) <- c("Symbol", "logFC", "pval", "FDR", "Group")
+  
+  # Add a column named direction, to show whether this gene is UP-regulated
+  # or DOWN-regulated after the treatment
+  curatedDGE <- curatedDGE %>% 
+    mutate("logFDR" = -log(FDR)) %>%
+    mutate(direction = case_when(FDR < 0.05 & logFC > 0 ~ "UP",
+                                 FDR < 0.05 & logFC < 0 ~ "DOWN",
+                                 FDR >= 0.05 ~ "NS")) 
+  return(curatedDGE)
+}
 
-# Add a column named direction, to show whether this gene is UP-regulated
-# or DOWN-regulated after the MET treatment
-curatedDGE_AET_vs_MET <- curatedDGE_AET_vs_MET %>% 
-  mutate("logFDR" = -log(FDR)) %>% 
-  mutate(direction = case_when(FDR < 0.05 & logFC > 0 ~ "UP",
-                                         FDR < 0.05 & logFC < 0 ~ "DOWN",
-                                         FDR >= 0.05 ~ "NS"))
+curatedDGE_AET_vs_MET <- import_dataset("Genes_AET_vs_AET+MET.xlsx")
+curatedDGE_MET_vs_SED <- import_dataset("Genes_AET+MET_vs_SED.xlsx")
+curatedDGE_SED_vs_AET <- import_dataset("Genes_SED_vs_AET.xlsx")
 
-totExpressed_AET_vs_MET <- curatedDGE_AET_vs_MET %>% 
-  tally() %>% 
-  mutate(direction = "all trans")
+category_plot <- function(curatedDGE, title){
+  totExpressed <- curatedDGE %>% 
+    tally() %>% 
+    mutate(direction = "all trans")
+  sigDirection <- curatedDGE %>% 
+    group_by(direction) %>% 
+    tally() 
+  allSig <- curatedDGE %>%
+    filter(direction != "NS") %>%
+    tally() %>% 
+    mutate(direction = "normal Sig")
+  restrictSig <- curatedDGE %>% 
+    filter(FDR <= 0.01) %>% 
+    tally() %>% 
+    mutate(direction = "restrictive Sig")
+  
+  # Plot transcript categories
+  transcriptBreakdown <- bind_rows(
+    totExpressed, sigDirection, allSig, restrictSig)
+  transcriptNumsPlot <- transcriptBreakdown %>% 
+    arrange(match(direction, c("all trans", "DOWN", "UP", 
+                               "normal Sig", "NS", 
+                               "restrictive Sig")), 
+            desc(direction)) %>% 
+    mutate(direction = factor(direction, levels = direction)) %>% 
+    ggplot(aes(x = direction, y = n, 
+               fill = direction)) + geom_col(color = "black", 
+                                             size = 0.25) +
+    xlab("Transcript Category") + ylab("count") + theme_bw() + 
+    theme(axis.line = element_line(color = "black"), 
+          panel.grid.major = element_blank(), 
+          panel.grid.minor = element_blank(), 
+          panel.border = element_blank(), 
+          axis.ticks.x = element_blank(),
+          plot.title = element_text(hjust = 0.5),
+          legend.position = "none") + 
+    # 10000 is the number of rows in curatedDGE
+    scale_y_continuous(expand = c(0,0), limits = c(0, 10000)) + 
+    geom_text(aes(label = n), vjust = -0.5) + 
+    scale_fill_manual(values = c("black", "#808080", 
+                                 "#524fa1", "#fdb913", 
+                                 "red", "cyan"))
+  ggsave(paste(title,"transcriptCategories.pdf",sep=" "), 
+         transcriptNumsPlot, 
+         height = 4, width = 4)
+}
 
-sigDirection_AET_vs_MET <- curatedDGE_AET_vs_MET %>% 
-  group_by(direction) %>% 
-  tally()
+category_plot(curatedDGE_AET_vs_MET, "AET_vs_MET")
+category_plot(curatedDGE_MET_vs_SED, "MET_vs_SED")
+category_plot(curatedDGE_SED_vs_AET, "SED_vs_AET")
 
-allSig_AET_vs_MET <- curatedDGE_AET_vs_MET %>% 
-  filter(direction != "NS") %>% 
-  tally() %>% 
-  mutate(direction = "normal Sig")
+volcano_plot <- function(curatedDGE, title){
+  curatedDGE %>% 
+    ggplot(aes(logFC, logFDR, color = direction)) + 
+    geom_point(size = 2) + theme_bw() + 
+    theme(axis.line = element_line(color = "black"),
+          panel.grid.minor = element_blank(),
+          panel.border = element_blank(),
+          plot.title = element_text(hjust = 0.5)) +
+    scale_color_manual(values = c("#662d91", 
+                                  "#999999", "#ed1c24")) + 
+    xlab(expression(paste("Log"[2],"(FC)"))) + 
+    ylab(expression(paste("-log"[10],"(FDR)"))) +
+    ggtitle("Volcano plot of AET+MET vs AET Control")
+  ggsave(paste(title,"Volcano.pdf",sep=" "), 
+         volcanoPlot, height = 4, width = 4) 
+}
 
-restrictSig_AET_vs_MET <- curatedDGE_AET_vs_MET %>% 
-  filter(FDR <= 0.01) %>% 
-  tally() %>% 
-  mutate(direction = "restrictive Sig")
+volcano_plot(curatedDGE_AET_vs_MET, "AET_vs_MET")
+volcano_plot(curatedDGE_MET_vs_SED, "MET_vs_SED")
+volcano_plot(curatedDGE_SED_vs_AET, "SED_vs_AET")
 
-# Plot transcript categories
-transcriptBreakdown <- bind_rows(totExpressed_AET_vs_MET, sigDirection_AET_vs_MET, 
-                                 allSig_AET_vs_MET, restrictSig_AET_vs_MET)
 
-transcriptNumsPlot <- transcriptBreakdown %>% 
-  arrange(match(direction, c("all trans", "DOWN", "UP", 
-                             "normal Sig", "NS", 
-                             "restrictive Sig")), 
-          desc(direction)) %>% 
-  mutate(direction = factor(direction, levels = direction)) %>% 
-  ggplot(aes(x = direction, y = n, 
-             fill = direction)) + geom_col(color = "black", 
-                                           size = 0.25) +
-  xlab("Transcript Category") + ylab("count") + theme_bw() + 
-  theme(axis.line = element_line(color = "black"), 
-        panel.grid.major = element_blank(), 
-        panel.grid.minor = element_blank(), 
-        panel.border = element_blank(), 
-        axis.ticks.x = element_blank(),
-        plot.title = element_text(hjust = 0.5),
-        legend.position = "none") + 
-  # 10000 is the number of rows in curatedDGE
-  scale_y_continuous(expand = c(0,0), limits = c(0, 10000)) + 
-  geom_text(aes(label = n), vjust = -0.5) + 
-  scale_fill_manual(values = c("black", "#808080", 
-                               "#524fa1", "#fdb913", 
-                               "red", "cyan"))
+sig_gene <- function(curatedDGE, title){
+  # Extract restrictively significant genes
+  sigGenes <- curatedDGE[,c("Symbol", "logFC","FDR")] %>% 
+    filter(FDR < 0.01) %>% 
+    # Calculate the non-log fold change and filter out rows with values smaller than 50%
+    # log2(1.5) is about 0.5849, we take 0.58 here
+    filter(abs(logFC)>= 0.58)
+  
+  write.csv(sigGenes, file = paste(title,"sigGenes.csv",sep=" "))
+  return(sigGenes)
+}
 
-ggsave("transcriptCategories_AET_vs_MET.pdf", transcriptNumsPlot, 
-       height = 4, width = 4)
-
-# Plot volcano plots
-volcanoPlot <- curatedDGE_AET_vs_MET %>% 
-  ggplot(aes(logFC, logFDR, color = direction)) + 
-  geom_point(size = 2) + theme_bw() + 
-  theme(axis.line = element_line(color = "black"),
-        panel.grid.minor = element_blank(),
-        panel.border = element_blank(),
-        plot.title = element_text(hjust = 0.5)) +
-  scale_color_manual(values = c("#662d91", 
-                                "#999999", "#ed1c24")) + 
-  xlab(expression(paste("Log"[2],"(FC)"))) + 
-  ylab(expression(paste("-log"[10],"(FDR)"))) +
-  ggtitle("Volcano plot of AET+MET vs AET Control")
-ggsave("Volcano_AET_vs_AET+MET.pdf", volcanoPlot, height = 4, width = 4)
-
-# Extract restrictively significant genes
-sigGenes_AET_vs_MET <- curatedDGE_AET_vs_MET[,c("Symbol", "logFC","FDR")] %>% 
-  filter(FDR < 0.01) %>% 
-  # Calculate the non-log fold change and filter out rows with values smaller than 50%
-  # log2(1.5) is about 0.5849, we take 0.58 here
-  filter(abs(logFC)>= 0.58)
-
-write.csv(sigGenes_AET_vs_MET, file = "sigGenes_AET_vs_MET.csv")
+sigGenes_AET_vs_MET <- sig_gene(curatedDGE_AET_vs_MET, "AET_vs_MET")
+sigGenes_MET_vs_SED <- sig_gene(curatedDGE_MET_vs_SED, "MET_vs_SED")
+sigGenes_SED_vs_AET <- sig_gene(curatedDGE_SED_vs_AET, "SED_vs_AET")
 
 # Run the enrichedKEGG GSEA Pathway analysis
 pathGenerate <- function(geneset, geneType){
@@ -131,16 +153,16 @@ pathGenerate <- function(geneset, geneType){
 
 stringentPathPlot <- function(pathway, title){
   pdf(paste(title,"KEGG pathways p less than 0.01.pdf",sep=" "))  
-  plot(  pathway %>% 
-           filter(p.adjust < 0.01) %>% 
-           ggplot(aes(x = Enrichment, y = Description, 
-                      color = p.adjust, size = Count)) + 
-           geom_point() + expand_limits(x = 0) + 
-           labs(x = "Enrichment", y = "KEGG pathway", 
-                color = "FDR", size = "Count") +
-           theme_bw() + scale_color_gradient(low = "#B72668", 
-                                             high = "#dba3b2") + 
-           ggtitle(paste(title,"KEGG pathways p < 0.01", sep = " ")))
+  plot(pathway %>% 
+        filter(p.adjust < 0.01) %>% 
+        ggplot(aes(x = Enrichment, y = Description, 
+                   color = p.adjust, size = Count)) + 
+        geom_point() + expand_limits(x = 0) + 
+        labs(x = "Enrichment", y = "KEGG pathway", 
+             color = "FDR", size = "Count") +
+        theme_bw() + scale_color_gradient(low = "#B72668", 
+                                          high = "#dba3b2") + 
+        ggtitle(paste(title,"KEGG pathways p < 0.01", sep = " ")))
   dev.off()
 }
 
