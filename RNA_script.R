@@ -87,7 +87,7 @@ category_plot(curatedDGE_SED_vs_AET, "SED_vs_AET")
 
 volcano_plot <- function(curatedDGE, title){
   curatedDGE %>% 
-    ggplot(aes(logFC, logFDR, color = direction)) + 
+    ggplot(aes(logFC, logFDR, color = direction,label = curatedDGE$Symbol)) + geom_text()+
     geom_point(size = 2) + theme_bw() + 
     theme(axis.line = element_line(color = "black"),
           panel.grid.minor = element_blank(),
@@ -98,7 +98,7 @@ volcano_plot <- function(curatedDGE, title){
     xlab(expression(paste("Log"[2],"(FC)"))) + 
     ylab(expression(paste("-log"[10],"(FDR)"))) +
     ggtitle("Volcano plot of AET+MET vs AET Control")
-  ggsave(paste(title,"Volcano.pdf",sep=" "), 
+  ggsave(paste(title,"Volcano.pdf",sep=" "),
          volcanoPlot, height = 4, width = 4) 
 }
 
@@ -124,7 +124,7 @@ sigGenes_MET_vs_SED <- sig_gene(curatedDGE_MET_vs_SED, "MET_vs_SED")
 sigGenes_SED_vs_AET <- sig_gene(curatedDGE_SED_vs_AET, "SED_vs_AET")
 
 # Run the enrichedKEGG GSEA Pathway analysis
-pathGenerate <- function(geneset, geneType){
+path_generate <- function(geneset, geneType){
   # Map the EMSEMBL IDs to their ENTREZID
   sameGenesEntrez <- na.exclude(mapIds(org.Mm.eg.db, 
                                        keys = as.character(geneset$Symbol),
@@ -151,7 +151,7 @@ pathGenerate <- function(geneset, geneType){
   return(allPaths)
 } 
 
-stringentPathPlot <- function(pathway, title){
+stringent_path_plot <- function(pathway, title){
   pdf(paste(title,"KEGG pathways p less than 0.01.pdf",sep=" "))  
   plot(pathway %>% 
         filter(p.adjust < 0.01) %>% 
@@ -166,7 +166,7 @@ stringentPathPlot <- function(pathway, title){
   dev.off()
 }
 
-relaxedPathPlot <- function(pathway, title){
+relaxed_path_plot <- function(pathway, title){
   pdf(paste(title,"KEGG p between 0.05 and 0.01.pdf",sep=" "))  
   plot(pathway %>% 
          filter(p.adjust < 0.05 & p.adjust >= 0.01) %>% 
@@ -181,7 +181,15 @@ relaxedPathPlot <- function(pathway, title){
   dev.off()
 }
 
-allPaths_AET_vs_MET = pathGenerate(sigGenes_AET_vs_MET, "AET vs. AET+MET")
+allPaths_AET_vs_MET <- path_generate(sigGenes_AET_vs_MET, "AET_vs_MET")
+allPaths_MET_vs_SED <- path_generate(sigGenes_MET_vs_SED, "MET_vs_SED")
+allPaths_SED_vs_AET <- path_generate(sigGenes_SED_vs_AET, "SED_vs_AET")
 
-stringentPathPlot(allPaths_AET_vs_MET, "AET vs. AET+MET")
-relaxedPathPlot(allPaths_AET_vs_MET, "AET vs. AET+MET")
+stringent_path_plot(allPaths_AET_vs_MET, "AET_vs_MET")
+relaxed_path_plot(allPaths_AET_vs_MET, "AET_vs_MET")
+
+stringent_path_plot(allPaths_MET_vs_SED, "MET_vs_SED")
+relaxed_path_plot(allPaths_MET_vs_SED, "MET_vs_SED")
+
+stringent_path_plot(allPaths_SED_vs_AET, "SED_vs_AET")
+relaxed_path_plot(allPaths_SED_vs_AET, "SED_vs_AET")
