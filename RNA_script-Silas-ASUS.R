@@ -6,8 +6,9 @@ if(!require(clusterProfiler))
   BiocManager::install("clusterProfiler")
 if(!require(org.Mm.eg.db))
   BiocManager::install("org.Mm.eg.db")
-if(!require(EnhancedVolcano))
-  BiocManager::install('EnhancedVolcano')
+if(!requireNamespace('BiocManager', quietly = TRUE))
+  install.packages('BiocManager')
+BiocManager::install('EnhancedVolcano')
 
 library(readxl)
 library(tidyverse)
@@ -15,6 +16,9 @@ library(ggplot2)
 library(clusterProfiler)
 library(org.Mm.eg.db)
 library(EnhancedVolcano)
+
+# Tutorial for Enhanced Volcano Plot:
+# https://bioconductor.org/packages/devel/bioc/vignettes/EnhancedVolcano/inst/doc/EnhancedVolcano.html
 
 # Note: Since in this project, we have not tested for MET only
 # So, MET means AET+MET unless otherwise specified
@@ -89,17 +93,26 @@ category_plot(curatedDGE_MET_vs_SED, "MET_vs_SED")
 category_plot(curatedDGE_SED_vs_AET, "SED_vs_AET")
 
 volcano_plot <- function(curatedDGE, title){
-  volcanoPlot <- 
-    curatedDGE %>% EnhancedVolcano(
-      lab = curatedDGE$Symbol,
-      x = 'logFC',
-      y = 'FDR',
-      xlab = expression(paste("Log"[2],"(FC)")),
-      ylab = expression(paste("-log"[10],"(FDR)")),
-      title = paste(title,"Volcano",sep=" ")
-    )
-  ggsave(paste(title,"Volcano.pdf",sep=" "), 
-         volcanoPlot)
+  # curatedDGE %>% 
+  #   ggplot(aes(logFC, logFDR, color = direction,label = curatedDGE$Symbol)) + geom_text()+
+  #   geom_point(size = 2) + theme_bw() + 
+  #   theme(axis.line = element_line(color = "black"),
+  #         panel.grid.minor = element_blank(),
+  #         panel.border = element_blank(),
+  #         plot.title = element_text(hjust = 0.5)) +
+  #   scale_color_manual(values = c("#662d91", 
+  #                                 "#999999", "#ed1c24")) + 
+  #   xlab(expression(paste("Log"[2],"(FC)"))) + 
+  #   ylab(expression(paste("-log"[10],"(FDR)"))) +
+  #   ggtitle("Volcano plot of AET+MET vs AET Control")
+  
+  curatedDGE %>% EnhancedVolcano(
+    x = expression(paste("Log"[2],"(FC)")),
+    y = expression(paste("-log"[10],"(FDR)"))
+  )
+  
+  ggsave(paste(title,"Volcano.pdf",sep=" "),
+         volcanoPlot, height = 4, width = 4) 
 }
 
 volcano_plot(curatedDGE_AET_vs_MET, "AET_vs_MET")
