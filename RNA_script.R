@@ -26,7 +26,6 @@ import_dataset <- function(filename){
   # Add a column named direction, to show whether this gene is UP-regulated
   # or DOWN-regulated after the treatment
   curatedDGE <- curatedDGE %>% 
-    mutate("logFDR" = -log(FDR)) %>%
     mutate(direction = case_when(FDR < 0.05 & logFC > 0 ~ "UP",
                                  FDR < 0.05 & logFC < 0 ~ "DOWN",
                                  FDR >= 0.05 ~ "NS")) 
@@ -74,7 +73,7 @@ category_plot <- function(curatedDGE, title){
           plot.title = element_text(hjust = 0.5),
           legend.position = "none") + 
     # 10000 is the number of rows in curatedDGE
-    scale_y_continuous(expand = c(0,0), limits = c(0, 10000)) + 
+    scale_y_continuous(expand = c(0,0), limits = c(0, nrow(curatedDGE)*1.1)) + 
     geom_text(aes(label = n), vjust = -0.5) + 
     scale_fill_manual(values = c("black", "#808080", 
                                  "#524fa1", "#fdb913", 
@@ -93,10 +92,25 @@ volcano_plot <- function(curatedDGE, title){
     curatedDGE %>% EnhancedVolcano(
       lab = curatedDGE$Symbol,
       x = 'logFC',
-      y = 'FDR',
+      y = 'FDR', # IMPORTANT: Do NOT put logFDR here
       xlab = expression(paste("Log"[2],"(FC)")),
       ylab = expression(paste("-log"[10],"(FDR)")),
-      title = paste(title,"Volcano",sep=" ")
+      FCcutoff = 1.5,
+      cutoffLineType = 'twodash',
+      # col = c("#999999", "#ed1c24", "#662d91"),
+      # pointSize = 3.0,
+      labSize = 4.0,
+      boxedLabels = TRUE,
+      colAlpha = 4/5,
+      drawConnectors = TRUE,
+      widthConnectors = 0.5,
+      colConnectors = 'grey50',
+      # Since dot colors are easy to understand, hide legends
+      legendPosition = 'none',
+      title = paste(title,"Volcano",sep=" "),
+      subtitle = '',
+      caption = '',
+      max.overlaps = 100
     )
   ggsave(paste(title,"Volcano.pdf",sep=" "), 
          volcanoPlot)
