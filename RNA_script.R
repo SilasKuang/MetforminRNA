@@ -6,12 +6,19 @@ if(!require(clusterProfiler))
   BiocManager::install("clusterProfiler")
 if(!require(org.Mm.eg.db))
   BiocManager::install("org.Mm.eg.db")
+if(!requireNamespace('BiocManager', quietly = TRUE))
+  install.packages('BiocManager')
+BiocManager::install('EnhancedVolcano')
 
 library(readxl)
 library(tidyverse)
 library(ggplot2)
 library(clusterProfiler)
 library(org.Mm.eg.db)
+library(EnhancedVolcano)
+
+# Tutorial for Enhanced Volcano Plot:
+# https://bioconductor.org/packages/devel/bioc/vignettes/EnhancedVolcano/inst/doc/EnhancedVolcano.html
 
 # Note: Since in this project, we have not tested for MET only
 # So, MET means AET+MET unless otherwise specified
